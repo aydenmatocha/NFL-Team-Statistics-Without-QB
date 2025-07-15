@@ -1,0 +1,104 @@
+---
+title: "NFL Team Statistics With/Without QB"
+author: "Ayden Matocha"
+date: "5/16/2025"
+output:
+  html_document:
+    toc: TRUE
+---
+
+# Packages Needed
+```{r}
+library(tidyverse)
+library(nflreadr)
+library(DT)
+```
+
+# Load Play-By-Play
+```{r}
+# Load play-by-play data (adjust years if needed)
+pbp <- load_pbp(2020:2024)
+```
+
+# Quarterbacks Used
+```{r}
+rosters <- load_rosters(2024)
+# List of QBs (as they appear in nflfastR passer_player_name)
+qbs <- c("J.Herbert", "J.Burrow", "T.Tagovailoa", "P.Mahomes", "L.Jackson",
+         "J.Love", "J.Allen", "K.Murray", "J.Hurts", "D.Prescott", "T.Lawrence")
+
+# Function to get first starter year
+get_first_starter_year <- function(qb_name, pbp_df) {
+  qb_games <- pbp_df %>%
+    filter(passer_player_name == qb_name) %>%
+    distinct(season, game_id, posteam)
+
+  if (nrow(qb_games) == 0) return(data.frame(qb = qb_name, first_start_season = NA))
+
+  qb_by_season <- qb_games %>%
+    group_by(season, posteam) %>%
+    summarize(games_started = n_distinct(game_id), .groups = "drop")
+
+  team_games <- pbp_df %>%
+    filter(posteam %in% qb_by_season$posteam) %>%
+    distinct(season, game_id, posteam) %>%
+    group_by(season, posteam) %>%
+    summarize(total_games = n(), .groups = "drop")
+
+  summary <- qb_by_season %>%
+    left_join(team_games, by = c("season", "posteam")) %>%
+    mutate(start_pct = games_started / total_games) %>%
+    filter(start_pct > 0.5) %>%
+    arrange(season) %>%
+    slice(1)
+
+  if (nrow(summary) == 0) {
+    return(data.frame(qb = qb_name, first_start_season = NA))
+  } else {
+    return(data.frame(qb = qb_name, first_start_season = summary$season))
+  }
+}
+
+# Apply to all QBs
+qb_start_years <- bind_rows(lapply(qbs, get_first_starter_year, pbp_df = pbp))
+
+print(qb_start_years)
+
+```
+
+```{r}
+# Get first starting years (assumes you've run this already)
+# qb_start_years <- ...
+
+# Function to get mean EPA for starter vs non-starters
+get_qb_epa_split <- function(qb_name, start_year, pbp_df) {
+  qb_plays <- pbp_df %>%
+    filter(season >= start_year, !is.na(passer_player_name)) %>%
+    filter(posteam %in% (pbp_df %>% filter(passer_player_name == qb_name) %>% distinct(posteam) %>% pull(posteam)))
+
+  qb_team <- qb_plays %>%
+    filter(passer_player_name == qb_name) %>%
+    distinct(posteam) %>%
+    pull(posteam)
+
+  qb_epa <- qb_plays %>%
+    mutate(qb_type = ifelse(passer_player_name == qb_name, "starter", "other")) %>%
+    group_by(qb_type) %>%
+    summarize(mean_epa = mean(epa, na.rm = TRUE)) %>%
+    pivot_wider(names_from = qb_type, values_from = mean_epa) %>%
+    mutate(qb = qb_name, team = qb_team, start_year = start_year)
+
+  return(qb_epa)
+}
+
+# Apply to all QBs
+epa_comparison <- bind_rows(
+  lapply(1:nrow(qb_start_years), function(i) {
+    get_qb_epa_split(qb_start_years$qb[i], qb_start_years$first_start_season[i], pbp)
+  })
+)
+
+print(epa_comparison)
+
+```
+

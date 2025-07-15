@@ -1,0 +1,54 @@
+---
+title: "R Notebook"
+output: html_notebook
+---
+
+# Packages Needed
+```{r}
+library(tidyverse)
+library(nflreadr)
+library(DT)
+```
+
+# Load Play-By-Play
+```{r}
+pbp <- load_pbp(2020:2024)
+```
+
+Test With Chargers/Herbert
+```{r}
+roster <- load_rosters(2020:2024)
+
+real_qbs <- roster %>%
+  filter(position == "QB") %>%
+  mutate(passer_abbr = paste0(substr(first_name, 1, 1), ".", last_name)) %>%
+  distinct(passer_abbr)
+qb_names <- real_qbs$passer_abbr
+qb_names
+
+real_qbs_id <- roster %>%
+  filter(position == "QB") %>%
+  distinct(gsis_id)
+qb_id <- real_qbs_id$gsis_id
+qb_id
+
+chargers_passers <- pbp %>%
+  filter(posteam == "LAC", !is.na(passer_player_name), passer_player_id %in% qb_id) %>%
+  group_by(passer_player_name) %>%
+  summarize(
+    dropbacks = n(),
+    mean_epa = mean(epa, na.rm = TRUE),
+    success_rate = mean(success == 1, na.rm = TRUE)
+  ) %>%
+  arrange(desc(dropbacks))
+chargers_passers
+```
+# Not Justin Herbert
+# not_Herb <- pbp %>%
+#  filter(posteam == "LAC", !is.na(passer_player_name, passer_player_name != "J.Herbert"))
+
+# Quarterbacks Used
+```{r}
+rosters <- load_rosters(2024)
+qbs <- c("J.Herbert", "J.Burrow", "T.Tagovailoa", "P.Mahomes", "L.Jackson",
+         "J.Love", "J.Allen", "K.Murray", "J.Hurts", "D.Prescott", "T.Lawrence")
