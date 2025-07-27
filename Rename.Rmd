@@ -1,0 +1,84 @@
+---
+title: "NFL Team Statistics With/Without QB"
+author: "Ayden Matocha"
+date: "7/25/2025"
+output:
+  html_document:
+    toc: TRUE
+---
+
+```{r}
+library(tidyverse)
+library(nflreadr)
+```
+
+```{r}
+pbp_2021 <- load_pbp(2021:2024)
+pbp_2023 <- load_pbp(2023:2024)
+```
+
+```{r}
+roster <- load_rosters(2020:2024)
+
+real_qbs_id <- roster %>%
+  filter(position == "QB") %>%
+  distinct(gsis_id)
+qb_id <- real_qbs_id$gsis_id
+```
+
+
+```{r}
+compare_qbs <- function(pbp_data, team_abbr, starter_name) {
+
+  starter <- pbp_data %>%
+    filter(posteam == team_abbr,
+           passer_player_id %in% qb_id,
+           passer_player_name == starter_name) %>%
+    group_by(posteam) %>%
+    summarize(
+      starter_dropbacks = n(),
+      starter_mean_epa = round(mean(epa, na.rm = TRUE), 3),
+      starter_success_rate = round(mean(success == 1, na.rm = TRUE), 3)
+    )
+
+  others <- pbp_data %>%
+    filter(posteam == team_abbr,
+           passer_player_id %in% qb_id,
+           passer_player_name != starter_name) %>%
+    group_by(posteam) %>%
+    summarize(
+      other_dropbacks = n(),
+      other_mean_epa = round(mean(epa, na.rm = TRUE), 3),
+      other_success_rate = round(mean(success == 1, na.rm = TRUE), 3)
+    )
+
+  combined <- starter %>%
+    left_join(others, by = "posteam") %>%
+    mutate(Starter = starter_name, 
+           epa_diff = starter_mean_epa - other_mean_epa,
+           success_diff = starter_success_rate - other_success_rate) %>%
+    rename(Team = posteam) %>%
+    select(Starter, Team, everything())
+  
+  return(combined)
+}
+
+compare_qbs(pbp_2021, "LAC", "J.Herbert")
+compare_qbs(pbp_2021, "CIN", "J.Burrow")
+compare_qbs(pbp_2021, "MIA", "T.Tagovailoa")
+compare_qbs(pbp_2021, "PHI", "J.Hurts")
+compare_qbs(pbp_2023, "GB", "J.Love")
+```
+
+```{r}
+results <- bind_rows(
+  compare_qbs(pbp_2021, "CIN", "J.Burrow"),
+  compare_qbs(pbp_2021, "MIA", "T.Tagovailoa"),
+  compare_qbs(pbp_2021, "LAC", "J.Herbert"),
+  compare_qbs(pbp_2023, "GB", "J.Love"),
+  compare_qbs(pbp_2021, "PHI", "J.Hurts")
+)
+
+results
+```
+
