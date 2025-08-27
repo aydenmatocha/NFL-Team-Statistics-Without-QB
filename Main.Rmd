@@ -62,12 +62,6 @@ compare_qbs <- function(pbp_data, team_abbr, starter_name) {
   
   return(combined)
 }
-
-compare_qbs(pbp_2021, "LAC", "J.Herbert")
-compare_qbs(pbp_2021, "CIN", "J.Burrow")
-compare_qbs(pbp_2021, "MIA", "T.Tagovailoa")
-compare_qbs(pbp_2021, "PHI", "J.Hurts")
-compare_qbs(pbp_2023, "GB", "J.Love")
 ```
 
 ```{r}
